@@ -1,5 +1,6 @@
 import os
 import json
+from tabnanny import check
 from fastapi import FastAPI
 from google.cloud import pubsub_v1, storage, vision
 from concurrent.futures import TimeoutError
@@ -20,15 +21,23 @@ def Vision(uri):
     objects = client.object_localization(image=image).localized_object_annotations
     element = []
     for object_ in objects:
-        element.append(object_.name)
+        element.append(str.lower(object_.name))
     return element
 
-
-# TODO(developer)
-# project_id = "your-project-id"
-# subscription_id = "your-subscription-id"
-# Number of seconds the subscriber should listen for messages
-# timeout = 5.0
+def launchVision(id):
+    data = db.collection('metadata').document(id).get()
+    data = data.to_dict()
+    uri = data["uri"]
+    word = data["word"]
+    user = data["userId"]
+    return checkWord(uri,word)
+    
+def checkWord(uri,word):
+    result = Vision(uri)
+    for i in range(len(result)):
+        if result[i] == word:
+            return 200
+    return 400
 
 subscriber = pubsub_v1.SubscriberClient()
 
@@ -37,19 +46,15 @@ bucket_name ="storage_image_api"
 bucket = storage_client.get_bucket(bucket_name)
 
 def callback(message: pubsub_v1.subscriber.message.Message) -> None:
-    data = message.data.decode("utf-8")
-    data = json.loads(str(data))
-    id = data['id']
-    data = db.collection('metadata').document(id).get()
-    uri = data["uri"]
-    word = data["word"]
-    user = data["userId"]
-    result = vision(uri)
-    for i in range(len(result)):
-        if result[i] == word:
-
+    id = message.data.decode("utf-8")
+    code = launchVision(id)
+    if(code == 200):
+            print("Trouve")
+            db.collection('metadata').document(id).update({"status":"True"})
             message.ack()
             return 200
+    print("Pas Trouve")
+    db.collection('metadata').document(id).update({"status":"True"})
     message.ack()
     return 400
 
@@ -65,3 +70,4 @@ with subscriber:
     except TimeoutError:
         streaming_pull_future.cancel()  # Trigger the shutdown.
         streaming_pull_future.result()  # Block until the shutdown is complete.
+
