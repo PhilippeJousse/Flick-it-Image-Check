@@ -1,13 +1,23 @@
-import os, firebase_admin
-from tabnanny import check
-from firebase_admin import credentials,firestore
+import os, pyrebase,json
 from google.cloud import pubsub_v1, storage, vision
 from concurrent.futures import TimeoutError
 
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = "google_key.json"
 
-firebase_admin.initialize_app(credentials.Certificate('serviceAccountCredentials.json'))
-db = firestore.client()
+firebaseConfig = {
+  "apiKey": "AIzaSyBnz6wws3EjTRnFOG7NvefKSr9CsaOlcxY",
+  "authDomain": "flick-it-users-storage.firebaseapp.com",
+  "databaseURL": "https://flick-it-users-storage-default-rtdb.europe-west1.firebasedatabase.app",
+  "projectId": "flick-it-users-storage",
+  "storageBucket": "flick-it-users-storage.appspot.com",
+  "messagingSenderId": "1046722019798",
+  "appId": "1:1046722019798:web:905b021820e1922f95a477",
+  "measurementId": "G-J3T9K8WPV2",
+  "serviceAccount": "serviceAccountCredentials.json"
+}
+firebase = pyrebase.initialize_app(firebaseConfig)
+
+db = firebase.database()
 
 publisher = pubsub_v1.PublisherClient()
 topic_path ="projects/third-essence-365119/topics/launch-scoring"
@@ -32,27 +42,26 @@ def checkWord(uri,word):
     return 400
 
 def getData(id):
-    data = db.collection('metadata').document(id).get()
-    data = data.to_dict()
-    return data
+    data = db.child("metadata").child(id).get()
+    return json.loads(json.dumps(data.val()))
 
 subscriber = pubsub_v1.SubscriberClient()
 
 storage_client = storage.Client()
 
-def callback(message: pubsub_v1.subscriber.message.Message) -> None:
+def callback(message: pubsub_v1.subscriber.message.Message):
     id = message.data.decode("utf-8")
     message.ack()
     data = getData(id)
     code = checkWord(data["uri"],data["word"])
     if(code == 200):
-            print("Trouve")
-            db.collection('metadata').document(id).update({"status":"True"})
-            id = id.encode('utf-8')
-            publisher.publish(topic_path,id)
-            return 200
+        print("Trouve")
+        db.child("metadata").child(id).update({"status":"True"})
+        id = id.encode('utf-8')
+        publisher.publish(topic_path,id)
+        return 200
     print("Pas Trouve")
-    db.collection('metadata').document(id).update({"status":"True"})
+    db.child("metadata").child(id).update({"status":"True"})
     return 400
 
 streaming_pull_future = subscriber.subscribe("projects/third-essence-365119/subscriptions/launch-vision-sub", callback=callback)
