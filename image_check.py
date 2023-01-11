@@ -2,7 +2,7 @@ import os, pyrebase,json
 from google.cloud import pubsub_v1, storage, vision
 from concurrent.futures import TimeoutError
 
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = "google_key.json"
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = "serviceAccountCredentials.json"
 
 with open('firebaseConfig.json') as f:
     firebaseConfig = f.read()
@@ -13,7 +13,7 @@ firebase = pyrebase.initialize_app(firebaseConfigContent)
 db = firebase.database()
 
 publisher = pubsub_v1.PublisherClient()
-topic_path ="projects/third-essence-365119/topics/launch-scoring"
+topic_path ="projects/flick-it-373707/topics/launch-scoring"
 
 def Vision(uri):
     client = vision.ImageAnnotatorClient()
@@ -57,8 +57,8 @@ def callback(message: pubsub_v1.subscriber.message.Message):
     db.child("metadata").child(id).update({"status":"True"})
     return 400
 
-streaming_pull_future = subscriber.subscribe("projects/third-essence-365119/subscriptions/launch-vision-sub", callback=callback)
-print(f"Listening for messages on projects/third-essence-365119/subscriptions/launch-vision-sub..\n")
+streaming_pull_future = subscriber.subscribe("projects/flick-it-373707/subscriptions/launch-vision-sub", callback=callback)
+print(f"Listening for messages on projects/flick-it-373707/subscriptions/launch-vision-sub..\n")
 
 # Wrap subscriber in a 'with' block to automatically call close() when done.
 with subscriber:
